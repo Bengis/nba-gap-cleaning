@@ -124,9 +124,11 @@ t_nba<-t_nba[which(t_nba$games!="0"),]
 * Se dividen todos los estadisticos de productividad por los partidos jugados. Asi tenemos estadisticos por partido, de minutos, puntos, rebotes, asistencias, robos, tapones y salario.
 
 ```{r, echo=TRUE}
-games<-t_nba[,2]
+games_m=82
+games_w=34
 for(i in 2:9) {
-    t_nba[,i] <- t_nba[,i]/games
+    t_nba[which(t_nba$sex=="0"),i] <- t_nba[which(t_nba$sex=="0"),i]/games_m
+    t_nba[which(t_nba$sex=="1"),i] <- t_nba[which(t_nba$sex=="1"),i]/games_w
 }
 ```
 
@@ -143,4 +145,27 @@ t_nba<-t_nba[which(t_nba$minutes!="0"),]
 ```
 
 * Eliminamos los registros de jugadores que tengan un número de minutos por partido que podamos catalogar como fringelier, es decir que se alejen 3 veces la desviación estandard de la media.
+
 * Al haber eliminado los fringeliers habremos eliminado tambien los outliers.
+
+
+```{r, echo=TRUE}
+remove_outliers <- function(x, limit = 3) {
+    mn <- mean(x, na.rm = T)
+    out <- limit * sd(x, na.rm = T)
+    x < (mn - out) | x > (mn + out)
+}
+t_nba<-t_nba[remove_outliers(t_nba$minutes,3)==FALSE,]
+```
+
+Vemos que con la definicion de fringelier no existen valores asociados a los minutos. Esto se debe a que la desviación estandard es lo bastante grande como para poder abarcar la practica totalidad de valores sin que se consideran fringeliers.
+
+Veamos una representación mediante boxplot de las variables numéricas:
+
+```{r boxplot,eval=TRUE,echo=TRUE}
+for(i in 1:ncol(t_nba)) {
+  if (is.numeric(t_nba[,i])){
+    boxplot(t_nba[,i], xlab = colnames(t_nba)[i], width = 100)
+  }
+}
+```
