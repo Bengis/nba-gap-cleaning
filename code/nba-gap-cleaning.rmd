@@ -30,10 +30,10 @@ Nuestro objetivo es unificar estas fuentes en un unico dataset, limpiarlo, norma
 
 ```{r, echo=TRUE}
 # read data
-nba_org <- read.csv("../data/nba-stats_out.csv")
+nba_org <- read.csv("../data/nba-stats_in.csv")
 nba_org["sex"] <- NA
 nba_org$sex<-"0"
-wnba_org <- read.csv("../data/wnba-stats_out.csv")
+wnba_org <- read.csv("../data/wnba-stats_in.csv")
 wnba_org["sex"] <- NA
 wnba_org$sex<-"1"
 t_nba <- rbind(nba_org, wnba_org)
@@ -44,7 +44,7 @@ n.var <- names(t_nba)
 # Descripción del dataset.
 ****
 
-Este dataset es interesante tanto para aficionados a la NBA y a la WNBA como para personas que quieran obtener datos acerca de la brecha salarial en los deportes profesionales.
+Este dataset es interesante tanto para aficionados a la NBA y a la WNBA como para personas que quieran obtener datos acerca de la brecha salarial en los deportes profesionales. Este dataset fue generado en la Práctica 1 de las asignatura "Tipología y ciclo de vida de los datos".
 
 El dataset y el código del mismo esta localizable en la siguiente dirección:
 
@@ -376,12 +376,15 @@ Por úiltimo procedemos a la exportación de datos en el dataset de salida.
 # Exportación del código en R y de los datos producidos.
 ****
 
-El código en R esta incluido en este fichero con extensión rcmd y tambien se puede descargar en GitHub desde la siguiente dirección:
+El código en R esta incluido en este fichero con extensión rmd y tambien se puede descargar en GitHub desde la siguiente dirección:
+
+https://github.com/Bengis/nba-gap-cleaning/blob/master/code/nba-gap-cleaning.r
 
 Los datos de salida se exportan mediante el siguiente comando y pueden ser descargados desde en GitHub desde la siguiente dirección:
 
+https://github.com/Bengis/nba-gap-cleaning/blob/master/data/nba_out.csv
 
 ```{r ,eval=TRUE,echo=TRUE}
-write.csv2(t_nba, file = "../data/nba_out.csv")
+write.csv(t_nba, file = "../data/nba_out.csv")
 ```
 

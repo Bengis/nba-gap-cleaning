@@ -1,0 +1,4 @@
+```{r, echo=TRUE}
+library(knitr)
+purl("nba-gap-cleaning.rmd")
+```

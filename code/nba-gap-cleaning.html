@@ -147,10 +147,10 @@ $(document).ready(function () {
 <p>Partimos de dos datasets, donde tenemos el total de minutos, partidos, puntos, rebotes, asistencias, tapones y robos efectuados por los jugadores de la NBA y las jugadores de la WNBA, que son la liga masuclina y femenina de baloncesto de Estados Unidos. Estos datos corresponden a la temporada 2016-17.</p>
 <p>Nuestro objetivo es unificar estas fuentes en un unico dataset, limpiarlo, normalizarlo si es necesario, y establecer visualizaciones que nos permitan obtener información sobre la brecha salarial existente entre ambas ligas.</p>
 <pre class="r"><code># read data
-nba_org &lt;- read.csv(&quot;../data/nba-stats_out.csv&quot;)
+nba_org &lt;- read.csv(&quot;../data/nba-stats_in.csv&quot;)
 nba_org[&quot;sex&quot;] &lt;- NA
 nba_org$sex&lt;-&quot;0&quot;
-wnba_org &lt;- read.csv(&quot;../data/wnba-stats_out.csv&quot;)
+wnba_org &lt;- read.csv(&quot;../data/wnba-stats_in.csv&quot;)
 wnba_org[&quot;sex&quot;] &lt;- NA
 wnba_org$sex&lt;-&quot;1&quot;
 t_nba &lt;- rbind(nba_org, wnba_org)</code></pre>
@@ -161,7 +161,7 @@ t_nba &lt;- rbind(nba_org, wnba_org)</code></pre>
 <div id="descripcion-del-dataset." class="section level1">
 <h1><span class="header-section-number">1</span> Descripción del dataset.</h1>
 <hr />
-<p>Este dataset es interesante tanto para aficionados a la NBA y a la WNBA como para personas que quieran obtener datos acerca de la brecha salarial en los deportes profesionales.</p>
+<p>Este dataset es interesante tanto para aficionados a la NBA y a la WNBA como para personas que quieran obtener datos acerca de la brecha salarial en los deportes profesionales. Este dataset fue generado en la Práctica 1 de las asignatura “Tipología y ciclo de vida de los datos”.</p>
 <p>El dataset y el código del mismo esta localizable en la siguiente dirección:</p>
 <p><a href="https://github.com/Bengis/nba-gap-cleaning" class="uri">https://github.com/Bengis/nba-gap-cleaning</a></p>
 <p>Si se consultan los datos de origen y se realizan visualizaciones de cuáles son las medias salariales de los jugadores y de las jugadoras,veremos que mientras los chicos tienen una media salarial de unos 10 millones de dolares las chicas tienen una media salarial de 100.000 dolares, lo cual representa un 1% del coste medio de cada jugadora de la NBA.</p>
@@ -1840,9 +1840,11 @@ barplot(counts, names=c(&quot;NBA&quot;, &quot;WNBA&quot;), main=&quot;Media de 
 <div id="exportacion-del-codigo-en-r-y-de-los-datos-producidos." class="section level1">
 <h1><span class="header-section-number">6</span> Exportación del código en R y de los datos producidos.</h1>
 <hr />
-<p>El código en R esta incluido en este fichero con extensión rcmd y tambien se puede descargar en GitHub desde la siguiente dirección:</p>
+<p>El código en R esta incluido en este fichero con extensión rmd y tambien se puede descargar en GitHub desde la siguiente dirección:</p>
+<p><a href="https://github.com/Bengis/nba-gap-cleaning/blob/master/code/nba-gap-cleaning.r" class="uri">https://github.com/Bengis/nba-gap-cleaning/blob/master/code/nba-gap-cleaning.r</a></p>
 <p>Los datos de salida se exportan mediante el siguiente comando y pueden ser descargados desde en GitHub desde la siguiente dirección:</p>
-<pre class="r"><code>write.csv2(t_nba, file = &quot;../data/nba_out.csv&quot;)</code></pre>
+<p><a href="https://github.com/Bengis/nba-gap-cleaning/blob/master/data/nba_out.csv" class="uri">https://github.com/Bengis/nba-gap-cleaning/blob/master/data/nba_out.csv</a></p>
+<pre class="r"><code>write.csv(t_nba, file = &quot;../data/nba_out.csv&quot;)</code></pre>
 </div>
 
 
