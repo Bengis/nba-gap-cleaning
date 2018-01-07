@@ -1,0 +1,387 @@
+---
+title: 'PRACTICA 2: LIMPIEZA Y VALIDACIÓN DE LOS DATOS'
+author: "Jose Ignacio Bengoechea Isasa"
+tuthor: "Mireia Calvo Gonzalez"
+date: '`r format(Sys.Date(),"%e de %B %Y")`'
+output:
+  html_document:
+    toc: yes
+    number_sections: yes
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_libraries, include=FALSE}
+library(knitr)
+library(lubridate)
+library(VIM)
+library(stringr)
+library(psych)
+library(pROC)
+library(dplyr)
+```
+
+Partimos de dos datasets, donde tenemos el total de minutos, partidos, puntos, rebotes, asistencias, tapones y robos efectuados por los jugadores de la NBA y las jugadores de la WNBA, que son la liga masuclina y femenina de baloncesto de Estados Unidos. Estos datos corresponden a la temporada 2016-17.
+
+Nuestro objetivo es unificar estas fuentes en un unico dataset, limpiarlo, normalizarlo si es necesario, y establecer visualizaciones que nos permitan obtener información sobre la brecha salarial existente entre ambas ligas.
+
+```{r, echo=TRUE}
+# read data
+nba_org <- read.csv("../data/nba-stats_out.csv")
+nba_org["sex"] <- NA
+nba_org$sex<-"0"
+wnba_org <- read.csv("../data/wnba-stats_out.csv")
+wnba_org["sex"] <- NA
+wnba_org$sex<-"1"
+t_nba <- rbind(nba_org, wnba_org)
+n.var <- names(t_nba)
+```
+
+****
+# Descripción del dataset.
+****
+
+Este dataset es interesante tanto para aficionados a la NBA y a la WNBA como para personas que quieran obtener datos acerca de la brecha salarial en los deportes profesionales.
+
+El dataset y el código del mismo esta localizable en la siguiente dirección:
+
+https://github.com/Bengis/nba-gap-cleaning
+
+Si se consultan los datos de origen y se realizan visualizaciones de cuáles son las medias salariales de los jugadores y de las jugadoras,veremos que mientras los chicos tienen una media salarial de unos 10 millones de dolares las chicas tienen una media salarial de 100.000 dolares, lo cual representa un 1% del coste medio de cada jugadora de la NBA.
+
+En esta práctica unificaremos los datos, los limpiaremos y trataremos de estimar un modelo que a partir de los datos nos pueda predecir el salario. Este modelo sera aplicado en el subconjunto de las chicas para ver si existe algun razonmiento productivo para que su salario sea tan bajo.
+
+****
+# Limpieza de datos
+****
+
+El fichero de datos contiene `r nrow(t_nba)` registros y  `r ncol(t_nba)` variables. 
+
+Contiene `r length(which(t_nba$sex==0))` jugadores y  `r length(which(t_nba$sex==1))` jugadoras.
+
+Las variables son `r toString(n.var)`.
+
+## Selección de variables
+
+De estas variables nos interesa eliminar las siguientes, ya que son campos calculados:
+
+* slry/pts. Es el resultado de salario/puntos.
+* slry/rbds. Es el resultado de salario/rebotes.
+* slry/asts. Es el resultado de salario/asistencias.
+* slry/stls. Es el resultado de salario/robos.
+* slry/blks. Es el resultado de salario/tapones.
+
+Estos campos se van a ver modificados en las transformaciones que vamos a ir realizando, por lo que no tiene sentido mantenerlos y realmente no nos interesan en este trabajo donde queremos centrarnos en la creación de un modelo.
+
+```{r, echo=TRUE}
+t_nba<-t_nba[,-10:-14]
+```
+
+## Tipos de variables
+
+La lectura del fichero con la función read.csv() ha realizado la siguiente asignación a cada variable, donde tenemos enteros en campos que van a ser transformados, para estos campos seria preferible usar un tipo numérico.
+
+```{r, echo=TRUE}
+# read data
+res <- sapply(t_nba,class)
+kable(data.frame(variables=names(res),clase=as.vector(res)))
+```
+
+Convertimos los atributos de estadisticas en tipo numérico.
+
+```{r, echo=TRUE}
+t_nba[2:8] <- lapply(t_nba[2:8], as.numeric)
+res <- sapply(t_nba,class)
+kable(data.frame(variables=names(res),clase=as.vector(res)))
+```
+
+
+## Eliminación de valores nulos, outliers y fringeliers
+
+En primer lugar vamos a ver la cantidad de valores nulos que existen por cada atributo.
+
+* Player. Es el nombre del jugador, no es una variables numérica.
+* Games. Partidos. Hay `r length(which(t_nba$games==0))` jugadores que no han jugado ningun partido.
+* Minutes. Minutos. Hay `r length(which(t_nba$minutes==0))` jugadores que no han jugado ni un minuto.
+* Points. Puntos. Hay `r length(which(t_nba$points==0))` jugadores que no han anotado.
+* Rebds. Rebotes.Hay `r length(which(t_nba$rebds==0))` jugadores que no han reboteado.
+* Assists. Asistencias.Hay `r length(which(t_nba$assists==0))` jugadores que no han asistido.
+* Steals. Robos. Hay `r length(which(t_nba$steals==0))` jugadores que no han robado jugadas.
+* Blocks. Tapones.Hay `r length(which(t_nba$blocks==0))` jugadores que no han taponado.
+* Salary. Salario. Hay `r length(which(t_nba$salary==0))` jugadores que no tienen salario.
+* Sex. Nos permite filtrar el sexo.
+
+Aunque no se han limpiado los datos, ni normalizado, se ven una series de relaciones que son interesantes:
+
+* Entre el número de minutos y partidos jugados la relación es lineal.
+
+```{r, echo=TRUE}
+t_nba_reduced<-t_nba[,-4:-10]
+t_nba_reduced<-t_nba_reduced[,-1:-1]
+pairs(t_nba_reduced)
+```
+
+* Entre el número de minutos jugados y los puntos la relación es lineal. 
+
+```{r, echo=TRUE}
+t_nba_reduced<-t_nba[,-5:-10]
+t_nba_reduced<-t_nba_reduced[,-1:-2]
+pairs(t_nba_reduced)
+```
+
+Esto me lleva a pensar que los minutos son un atributo esencial, si un jugador no juega obviamente no va a tener oportunidad de conseguir ninguna estadistica. 
+
+Por otro lado, debemos tener en cuenta que tenemos dos origenes de datos distintos. 
+
+* Los jugadores de la NBA juegan un máximo de 82 partidos por temporada.
+* Las jugadoras de la WNBA juegan un máximo de 34 partidos por temporada.
+
+Por lo que los valores estadisticos totales discriminan a las jugadoras, que no tendran la misma cantidad de puntos, ni de rebotes. 
+
+Por lo que realizaremos los siguientes ajustes:
+
+* Se elimina la columna de total de partidos. 
+
+```{r, echo=TRUE}
+t_nba<-t_nba[which(t_nba$games!="0"),]
+```
+
+* Se dividen todos los estadisticos de productividad por los partidos jugados. Asi tenemos estadisticos por partido, de minutos, puntos, rebotes, asistencias, robos, tapones y salario. De esta forma unificamos los datos de chicos y chicas.
+
+```{r, echo=TRUE}
+games_m=82
+games_w=34
+for(i in 2:8) {
+    t_nba[which(t_nba$sex=="0"),i] <- t_nba[which(t_nba$sex=="0"),i]/games_m
+    t_nba[which(t_nba$sex=="1"),i] <- t_nba[which(t_nba$sex=="1"),i]/games_w
+}
+```
+
+* Se elimina la columna de total de partidos. 
+
+```{r, echo=TRUE}
+t_nba<-t_nba[,-2:-2]
+```
+
+* Eliminamos los registros de jugadores que no han jugado ningún minuto.
+
+```{r, echo=TRUE}
+t_nba<-t_nba[which(t_nba$minutes!="0"),]
+```
+
+* Eliminamos los registros de jugadores que tengan un número de minutos por partido que podamos catalogar como fringelier, es decir que se alejen 3 veces la desviación estandard de la media.
+
+* Al haber eliminado los fringeliers habremos eliminado tambien los outliers.
+
+
+```{r, echo=TRUE}
+remove_outliers <- function(x, limit = 3) {
+    mn <- mean(x, na.rm = T)
+    out <- limit * sd(x, na.rm = T)
+    x < (mn - out) | x > (mn + out)
+}
+t_nba<-t_nba[remove_outliers(t_nba$minutes,3)==FALSE,]
+```
+
+Vemos que con la definicion de fringelier no existen valores asociados a los minutos. Esto se debe a que la desviación estandard es lo bastante grande como para poder abarcar la practica totalidad de valores sin que se consideran fringeliers.
+
+Veamos una representación mediante boxplot de las variables numéricas:
+
+```{r boxplot,eval=TRUE,echo=TRUE}
+par(mfrow=c(2,2))
+for(i in 1:ncol(t_nba)) {
+  if (is.numeric(t_nba[,i])){
+    boxplot(t_nba[,i], main = colnames(t_nba)[i], width = 100)
+  }
+}
+par(mfrow=c(1,1))
+```
+
+Mediante los boxplots vemos la presencia de outliers en puntos, rebotes, asistencias, robos, tapones e incluso en el salario. 
+
+Al revisar los datos vemos que han habido errores durante el proceso de scrapping, que han generado estos outliers en las variables rebotes, asistencias y tapones. En el resto no son errores sino valores de productividad por encima de la media en jugadores que son muy productivos los cuales me resisto a eliminar ya que considero que son validos.
+
+El objetivo de la práctica es mostrar la desigualdad salarial entre hombres y mujeres, y para ello es necesario que se mantengan los estadisticos que han producido estos jugadores sin eliminar los que no sean validos. 
+
+```{r, echo=TRUE}
+filas_bro<-nrow(t_nba)
+t_nba<-t_nba[remove_outliers(t_nba$rebds.,3)==FALSE,]
+t_nba<-t_nba[remove_outliers(t_nba$assists,3)==FALSE,]
+t_nba<-t_nba[remove_outliers(t_nba$blocks,3)==FALSE,]
+filas_aro<-nrow(t_nba)
+```
+
+Hemos pasado de `r filas_bro` filas a `r filas_aro` filas.
+
+****
+# Normalización de datos
+****
+
+## Revisión de datos normalizados
+
+Para revisar si las variables pueden ser candidatas a la normalización miramos las graficas de quantile-quantile plot y el histograma.
+
+```{r ,eval=TRUE,echo=TRUE}
+par(mfrow=c(2,2))
+for(i in 1:ncol(t_nba)) {
+  if (is.numeric(t_nba[,i])){
+    qqnorm(t_nba[,i],main = paste("Normal Q-Q Plot for ",colnames(t_nba)[i]))
+    qqline(t_nba[,i],col="red")
+    hist(t_nba[,i], 
+      main=paste("Histogram for ", colnames(t_nba)[i]), 
+      xlab=colnames(t_nba)[i], freq = FALSE)
+  }
+}
+```
+
+Los resultados del quantile-quantile plot nos indica que las variables pueden ser candidatas a la normalización si es necesario.
+
+Para revisar si las variables estan normalizadas se aplica el test de Shapiro Wilk en cada variables numérica. 
+
+```{r ,eval=TRUE,echo=TRUE}
+shapiro.test(t_nba$minutes)
+```
+
+```{r ,eval=TRUE,echo=TRUE}
+shapiro.test(t_nba$points)
+```
+
+```{r ,eval=TRUE,echo=TRUE}
+shapiro.test(t_nba$rebds.)
+```
+
+```{r ,eval=TRUE,echo=TRUE}
+shapiro.test(t_nba$assists)
+```
+
+```{r ,eval=TRUE,echo=TRUE}
+shapiro.test(t_nba$steals)
+```
+
+```{r ,eval=TRUE,echo=TRUE}
+shapiro.test(t_nba$blocks)
+```
+
+```{r ,eval=TRUE,echo=TRUE}
+shapiro.test(t_nba$salary)
+```
+
+El test nos indica que ninguna variable esta normalizada, ya que el p-valor es inferior al coeficiente 0.05, por lo que se puede rechazar la hipotesis nula y entender que no es normal.
+
+Que no sea normal no quiere decir que no pueda ser normalizable, ya que segun el teorema del limite central al tener mas de 30 elementos en las observaciones podemos aproximarla como una distribución normal de media 0 y desviación estandard 1.
+
+## Transformación de datos normalizados
+
+Es posible normalizar todos los datos, pero en la representación final de los mismos me gustaria que se pudieran ver los valores reales de los estadisticos. Esto implica que no se realice la normalización, ya que nos permitira ver e identificar de una manera mas realista la brecha salarial, no solo en porcentaje sino con los valores reales.
+
+## Aplicación de pruebas estadisticas
+
+Como hemos indicado anteriormente existe una correlación entre los valores de las estadisticas y de los minutos, un mayor numero de minutos debe representar un valor mayor en las estadisticas. 
+
+Asi mismo debe existir una relación entre el salario y las estadisticas, ya que cuanto mejor sea el jugador mas se le va a pagar. Los salarios de los jugadores de la NBA son reales en el dataset. Sin embargo, los salario de las jugadores de la WNBA son estimaciones obtenidas a partir del salario maximo posible.
+
+Para poder determinar entonces el modelo del salario podemos usar un modelo de regresión simple que se base en el estadistico mas importante dentro del juego del baloncesto que son los puntos.
+
+Este modelo se implementa en un set dividido en dos subconjuntos, uno para entrenarlo llamado train y otro para evaluarlo llamado test. La caracteristica de este dataset es que solo hay jugadores de la NBA, de esta forma podemos valorar los salarios que se predicen dentro del entorno de estos jugadores.
+
+Luego usaremos ese modelo para predecir cual deberia ser el salario en el dataset de las chicas y compararlo con el real.
+
+```{r ,eval=TRUE,echo=TRUE}
+t_nba_glm<-t_nba[which(t_nba$sex=="0"),]
+ntrain <- nrow(t_nba_glm)*0.8
+ntest <- nrow(t_nba_glm)*0.2
+set.seed(1)
+index_train<-sample(1:nrow(t_nba_glm),size = ntrain)
+train<-t_nba_glm[index_train,]
+test<-t_nba_glm[-index_train,]
+modelo<-lm(formula = salary ~ points, data=train)
+summary(modelo)
+```
+
+El modelo no es muy bueno, el coeficiente R^2 ajustado es 0.3764, bastante alejado del optimo. Sin embargo el uso de la variables de los puntos parece adecuada de acuerdo al p-valor de la misma.
+
+Podemos comprobar la validez del modelo realizando la predicción y comparando los valores predecidos con los reales.
+
+
+```{r ,eval=TRUE,echo=TRUE}
+prob_sl<-predict(modelo, test, type="response")
+mc_sl<-data.frame(
+  real=test$salary,
+  predicted= prob_sl,
+  dif=ifelse(test$salary>prob_sl, -prob_sl*100/test$salary,prob_sl*100/test$salary)
+  )
+colnames(mc_sl)<-c("Real","Predecido","Dif%")
+kable(mc_sl)
+```
+
+
+Sin embargo esta práctica no se basa en tratar de establecer el salario a partir de las estadisticas, sino en ver la brecha salarial. Para ello vamos a predecir el salario de las chicas con este mismo modelo y compararlo con los datos reales. 
+
+
+## Comparación de datos con el dataset de las jugadoras de la WNBA
+
+¿Que ocurriria si aplicasemos el mismo modelo con las chicas?
+
+```{r ,eval=TRUE,echo=TRUE}
+test<-t_nba[which(t_nba$sex=="1"),]
+prob_sl<-predict(modelo, test, type="response")
+mc_sl<-data.frame(
+  real=test$salary,
+  predicted= prob_sl,
+  dif=ifelse(test$salary>prob_sl, -prob_sl*100/test$salary,prob_sl*100/test$salary)
+  )
+colnames(mc_sl)<-c("Real","Predecido","Dif%")
+kable(mc_sl)
+```
+
+
+Pasariamos de diferencias medias del 100% a diferencias del 10000%. Las chicas estarian encantadas de que se valorase su productividad incluso con un modelo que se ajuste tan mal ya que supondria un incremento superior al 1000% de su sueldo.
+
+Lo que podemos ver es que el modelo de predicción de salario de los chicos aunque no es optimo es mucho mejor que el modelo real que se esta utilizando en la WNBA. 
+
+****
+# Representación de los resultados a partir de tablas y gráficas.
+****
+
+Hay muchas representaciones que nos dan una idea de lo enorme que es la brecha salarial, pero creo que la siguiente, que muestra la cantidad media de dinero que ganan por jugador y jugadora es la mas significativa.
+
+```{r ,eval=TRUE,echo=TRUE}
+options(scipen=5)
+nba_salary=sum(as.numeric(t_nba$salary[which(t_nba$sex==0)])/length(which(t_nba$sex==0)))
+wnba_salary=sum(as.numeric(t_nba$salary[which(t_nba$sex==1)])/length(which(t_nba$sex==1)))
+counts <- c(nba_salary, wnba_salary)
+barplot(counts, names=c("NBA", "WNBA"), main="Media de salarios por jugador de cada liga", 
+  	xlab="Liga")
+```
+
+Una diferencia tremenda, posiblemente una de las mayores brechas salariales que existe en el deporte profesional, e incluso me atrevo a decir que en gran parte de las profesiones.
+
+****
+# Resolución del problema y conclusiones.
+****
+
+Nos queda que:
+
+* El salario medio para un jugador de la NBA es de  `r toString(round(nba_salary, digits=0))` dolares.
+* El salario medio para una jugadora de la WNBA es de  `r toString(round(wnba_salary, digits=0))` dolares.
+
+Estamos hablando de que cada jugadora gana de salario medio un 1% del salario medio de cada jugador. De hecho con solo dos jugadores de la NBA basta para que sus salarios sean superiores al de total de jugadoras de la WNBA.
+
+Por úiltimo procedemos a la exportación de datos en el dataset de salida.
+
+****
+# Exportación del código en R y de los datos producidos.
+****
+
+El código en R esta incluido en este fichero con extensión rcmd y tambien se puede descargar en GitHub desde la siguiente dirección:
+
+Los datos de salida se exportan mediante el siguiente comando y pueden ser descargados desde en GitHub desde la siguiente dirección:
+
+
+```{r ,eval=TRUE,echo=TRUE}
+write.csv2(t_nba, file = "../data/nba_out.csv")
+```
+
